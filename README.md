@@ -9,10 +9,10 @@ You are a video game designer for Ubisoft games. You have been given the task of
 2.	Background color is grey
 3.	Code written in Python language
 4.	Has a Welcome to Tetris screen that allows you to click “Play” or click “Settings”
-a.	After player clicks “Settings” screen pops up allowing the player to change the rate of each falling block from 1 (slowest) to 5 (fastest)
-b.	After player makes this choice, player can click the “Back” button at the bottom of the screen where their selection is saved.
-c.	After player clicks “Play” the game begins.
-5.	Scoring is the same as the original Tetris game
+  	    a.	After player clicks “Settings” screen pops up allowing the player to change the rate of each falling block from 1 (slowest) to 5 (fastest)
+        b.	After player makes this choice, player can click the “Back” button at the bottom of the screen where their selection is saved.
+        c.	After player clicks “Play” the game begins.
+6.	Scoring is the same as the original Tetris game
 
 Ask me any additional questions (one at a time) if needed to complete this request.
 
