@@ -1,0 +1,271 @@
+import pygame
+import sys
+import random
+
+# Constants
+SCREEN_WIDTH_MAIN = 600
+SCREEN_HEIGHT = 350
+SCREEN_WIDTH_GAME = 450  # Shortened screen width for gameplay
+GREY = (169, 169, 169)
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+ROYAL_BLUE = (65, 105, 225)
+FPS = 60
+BLOCK_SIZE = 20
+GRID_WIDTH = SCREEN_WIDTH_GAME // BLOCK_SIZE
+GRID_HEIGHT = (SCREEN_HEIGHT - 50) // BLOCK_SIZE
+
+# Tetrimino shapes
+SHAPES = [
+    [[1, 1, 1, 1]],  # I
+    [[1, 1], [1, 1]],  # O
+    [[0, 1, 1], [1, 1, 0]],  # Z
+    [[1, 1, 0], [0, 1, 1]],  # S
+    [[1, 1, 1], [0, 1, 0]],  # T
+    [[1, 1, 1], [1, 0, 0]],  # L
+    [[1, 1, 1], [0, 0, 1]]   # J
+]
+
+# Mapping speed levels (1 to 5) to falling intervals (in milliseconds)
+speed_to_interval = {
+    1: 100,  # Slowest, 1 second per block fall
+    2: 80,
+    3: 60,
+    4: 40,
+    5: 20   # Fastest, 0.2 seconds per block fall
+}
+
+# Initialize pygame
+pygame.init()
+
+# Set up the screen
+screen = pygame.display.set_mode((SCREEN_WIDTH_MAIN, SCREEN_HEIGHT))
+pygame.display.set_caption("Ubisoft Tetris")
+
+# Global game state variables
+current_screen = "main_menu"
+falling_speed = 3  # Default falling speed
+score = 0
+paused = False
+grid = [[0] * GRID_WIDTH for _ in range(GRID_HEIGHT)]  # Game grid
+
+# Font setup
+font = pygame.font.SysFont("Arial", 24)
+
+# Tetrimino class
+class Tetrimino:
+    def __init__(self):
+        self.shape = random.choice(SHAPES)
+        self.x = GRID_WIDTH // 2 - len(self.shape[0]) // 2
+        self.y = 0
+        self.rotation = 0
+
+    def rotate(self):
+        self.shape = [list(row) for row in zip(*self.shape[::-1])]
+
+    def draw(self, surface):
+        for row in range(len(self.shape)):
+            for col in range(len(self.shape[row])):
+                if self.shape[row][col]:
+                    pygame.draw.rect(surface, ROYAL_BLUE, pygame.Rect((self.x + col) * BLOCK_SIZE, (self.y + row) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE))
+
+    def move(self, dx, dy):
+        self.x += dx
+        self.y += dy
+
+    def is_valid_position(self, grid):
+        for row in range(len(self.shape)):
+            for col in range(len(self.shape[row])):
+                if self.shape[row][col]:
+                    new_x = self.x + col
+                    new_y = self.y + row
+                    if new_x < 0 or new_x >= GRID_WIDTH or new_y >= GRID_HEIGHT:
+                        return False
+                    if new_y >= 0 and grid[new_y][new_x]:
+                        return False
+        return True
+
+    def place(self, grid):
+        for row in range(len(self.shape)):
+            for col in range(len(self.shape[row])):
+                if self.shape[row][col]:
+                    grid[self.y + row][self.x + col] = 1
+
+def draw_grid(surface):
+    for row in range(GRID_HEIGHT):
+        for col in range(GRID_WIDTH):
+            if grid[row][col]:
+                pygame.draw.rect(surface, ROYAL_BLUE, pygame.Rect(col * BLOCK_SIZE, row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE), 0)
+            pygame.draw.rect(surface, GREY, pygame.Rect(col * BLOCK_SIZE, row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE), 1)
+
+def clear_lines(grid):
+    global score
+    lines_to_clear = [i for i, row in enumerate(grid) if all(row)]
+    for i in lines_to_clear:
+        del grid[i]
+        grid.insert(0, [0] * GRID_WIDTH)
+    score += len(lines_to_clear) * 100
+
+def game_over():
+    for col in range(GRID_WIDTH):
+        if grid[0][col]:
+            return True
+    return False
+
+def main_menu():
+    global current_screen
+    screen.fill(GREY)
+    draw_text("Welcome to Tetris", font, WHITE, screen, SCREEN_WIDTH_MAIN // 2, SCREEN_HEIGHT // 4)
+
+    # Play button
+    play_button = pygame.Rect(SCREEN_WIDTH_MAIN // 4, SCREEN_HEIGHT // 2, SCREEN_WIDTH_MAIN // 2, 50)
+    pygame.draw.rect(screen, WHITE, play_button)
+    draw_text("Play", font, BLACK, screen, SCREEN_WIDTH_MAIN // 2, SCREEN_HEIGHT // 2 + 25)
+
+    # Settings button
+    settings_button = pygame.Rect(SCREEN_WIDTH_MAIN // 4, SCREEN_HEIGHT // 2 + 100, SCREEN_WIDTH_MAIN // 2, 50)
+    pygame.draw.rect(screen, WHITE, settings_button)
+    draw_text("Settings", font, BLACK, screen, SCREEN_WIDTH_MAIN // 2, SCREEN_HEIGHT // 2 + 125)
+
+    # Check for button clicks
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if play_button.collidepoint(event.pos):
+                current_screen = "game"
+            if settings_button.collidepoint(event.pos):
+                current_screen = "settings"
+
+def settings_menu():
+    global current_screen, falling_speed
+    screen.fill(GREY)
+    draw_text("Settings", font, WHITE, screen, SCREEN_WIDTH_MAIN // 2, SCREEN_HEIGHT // 4)
+
+    # Speed settings (1 to 5)
+    for i in range(1, 6):
+        # Highlight the selected speed with royal blue
+        if i == falling_speed:
+            color = ROYAL_BLUE
+        else:
+            color = WHITE
+
+        speed_button = pygame.Rect(100 * i, SCREEN_HEIGHT // 2, 50, 50)
+        pygame.draw.rect(screen, color, speed_button)
+        draw_text(str(i), font, BLACK, screen, 100 * i + 25, SCREEN_HEIGHT // 2 + 25)
+
+    # Back button
+    back_button = pygame.Rect(SCREEN_WIDTH_MAIN // 4, SCREEN_HEIGHT // 2 + 100, SCREEN_WIDTH_MAIN // 2, 50)
+    pygame.draw.rect(screen, WHITE, back_button)
+    draw_text("Back", font, BLACK, screen, SCREEN_WIDTH_MAIN // 2, SCREEN_HEIGHT // 2 + 125)
+
+    # Check for button clicks
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            # Check if the user clicked on a speed button
+            for i in range(1, 6):
+                speed_button = pygame.Rect(100 * i, SCREEN_HEIGHT // 2, 50, 50)
+                if speed_button.collidepoint(event.pos):
+                    falling_speed = i  # Update the speed to the clicked value
+
+            # Check if the user clicked on the back button
+            if back_button.collidepoint(event.pos):
+                current_screen = "main_menu"
+
+def draw_text(text, font, color, surface, x, y):
+    text_obj = font.render(text, True, color)
+    text_rect = text_obj.get_rect(center=(x, y))
+    surface.blit(text_obj, text_rect)
+
+def game():
+    global current_screen, score, paused
+    screen = pygame.display.set_mode((SCREEN_WIDTH_GAME, SCREEN_HEIGHT))  # Adjust screen width for gameplay
+
+    clock = pygame.time.Clock()
+    current_tetrimino = Tetrimino()
+
+    # Retrieve the fall interval from the speed mapping
+    fall_interval = speed_to_interval[falling_speed]  # Use the player's selected speed interval
+    fall_time = 0
+
+    while True:
+        screen.fill(GREY)
+
+        # Handle events
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LEFT and not paused:
+                    current_tetrimino.move(-1, 0)
+                    if not current_tetrimino.is_valid_position(grid):
+                        current_tetrimino.move(1, 0)
+                elif event.key == pygame.K_RIGHT and not paused:
+                    current_tetrimino.move(1, 0)
+                    if not current_tetrimino.is_valid_position(grid):
+                        current_tetrimino.move(-1, 0)
+                elif event.key == pygame.K_DOWN and not paused:
+                    current_tetrimino.move(0, 1)
+                    if not current_tetrimino.is_valid_position(grid):
+                        current_tetrimino.move(0, -1)
+                elif event.key == pygame.K_UP and not paused:
+                    current_tetrimino.rotate()
+                    if not current_tetrimino.is_valid_position(grid):
+                        current_tetrimino.rotate()
+                        current_tetrimino.rotate()
+                        current_tetrimino.rotate()
+                elif event.key == pygame.K_SPACE:  # Toggle pause state
+                    paused = not paused
+
+        # Pause functionality
+        if paused:
+            draw_text("PAUSE", font, ROYAL_BLUE, screen, SCREEN_WIDTH_GAME // 2, SCREEN_HEIGHT // 2)
+            pygame.display.flip()
+            clock.tick(FPS)
+            continue
+
+        # Game over condition
+        if game_over():
+            draw_text("Game Over! Score: " + str(score), font, WHITE, screen, SCREEN_WIDTH_GAME // 2, SCREEN_HEIGHT // 2)
+            pygame.display.flip()
+            pygame.time.wait(3000)
+            current_screen = "main_menu"
+            return
+
+        # Move tetrimino down based on the selected speed interval
+        fall_time += clock.get_rawtime()
+        clock.tick(FPS)
+        
+        if fall_time >= fall_interval and not paused:
+            current_tetrimino.move(0, 1)
+            if not current_tetrimino.is_valid_position(grid):
+                current_tetrimino.move(0, -1)
+                current_tetrimino.place(grid)
+                clear_lines(grid)
+                current_tetrimino = Tetrimino()
+                if not current_tetrimino.is_valid_position(grid):
+                    break
+            fall_time = 0
+
+        current_tetrimino.draw(screen)
+        draw_grid(screen)
+        draw_text(f"Score: {score}", font, WHITE, screen, SCREEN_WIDTH_GAME // 2, SCREEN_HEIGHT - 20)
+        pygame.display.flip()
+
+# Main game loop
+clock = pygame.time.Clock()
+while True:
+    if current_screen == "main_menu":
+        main_menu()
+    elif current_screen == "settings":
+        settings_menu()
+    elif current_screen == "game":
+        game()
+
+    pygame.display.flip()
+    clock.tick(FPS)
